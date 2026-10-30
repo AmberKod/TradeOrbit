@@ -1,12 +1,12 @@
 # TradeOrbit 开发工作计划
 
-版本：v0.1 / 日期：2026-10-30 / 模式：需求与架构阶段，尚未开始功能实现。
+版本：v0.1 / 日期：2026-10-30 / 模式：E01 已完成本地验收，后续工作包尚未开始。
 
 ## 1. 执行原则
 
 仅设置五个顶层工作包；每包按模块交付，下面的检查项是验收清单，不是另起独立工程。先形成完整的只读闭环，再开放交易。前端可用带 schema_version 的固定回放数据并行开发，但页面必须标为演示数据。
 
-所有工作包当前状态均为 NOT_STARTED。本次完成的是规划文档，不把编写文档算作实现完成。具体工期在 E01 环境和三所能力探测完成后评估，不虚构日期、人员或上线承诺。
+当前状态：E01 = DONE（21 项后端测试、8 项前端测试、真实数据库迁移/并发/重启、完整容器部署及登录页桌面/窄屏验收通过）；E02–E05 = NOT_STARTED。证据见 [E01 验收记录](08-e01-acceptance-report.md)，启动步骤见 [本地运行手册](07-local-development.md)。具体后续工期在三所能力探测后评估，不虚构日期、人员或上线承诺。
 
 ~~~mermaid
 flowchart LR
@@ -28,7 +28,7 @@ flowchart LR
 - 账户连接配置与密钥加密接口；交易默认关闭；环境枚举、敏感日志屏蔽和审计。
 - CI 的 lint / typecheck / unit / contract / build 入口；固定依赖版本，不直接使用下载目录的开发分支充当生产依赖。
 
-主要文件：frontend/package.json、frontend/src/main.ts、frontend/src/router/index.ts、backend/pyproject.toml、backend/app/main.py、backend/app/core/config.py、backend/app/core/security.py、backend/app/api/auth.py、backend/app/models/accounts.py、backend/alembic/、infra/compose.yaml、.env.example、.gitignore、CI 配置。
+主要文件：frontend/package.json、frontend/src/main.ts、frontend/src/router/index.ts、backend/pyproject.toml、backend/app/main.py、backend/app/core/config.py、backend/app/core/security.py、backend/app/api/auth.py、backend/app/models/accounts.py、backend/alembic/、compose.yaml、.env.example、.gitignore、CI 配置。
 
 需求覆盖：FR-ACC-01、02、03、06；FR-OPS-02、03、04。接口：认证、账户配置、健康和审计。详细路径见实现设计。
 
