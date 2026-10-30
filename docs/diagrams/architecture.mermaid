@@ -1,0 +1,17 @@
+flowchart TB
+ B[浏览器 Vue3] --> G[反向代理 HTTPS]
+ G --> A[FastAPI HTTP + WebSocket]
+ A --> D[(PostgreSQL)]
+ A --> R[(Redis 缓存/广播)]
+ M[行情Worker] --> X[ExchangeAdapter]
+ C[账户同步Worker] --> X
+ E[交易执行Worker] --> X
+ X --> EX[Binance / Bitget / OKX]
+ M --> R
+ C --> D
+ E --> D
+ D --> O[事务Outbox分发]
+ O --> N[告警/通知Worker]
+ O --> A
+ S[隔离策略Worker] --> I[Intent + 风控入口]
+ I --> D

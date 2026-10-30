@@ -1,0 +1,45 @@
+classDiagram
+ class AccountConnection {
+   UUID id
+   string exchange
+   string environment
+   string account_mode
+   probe_capabilities()
+ }
+ class WalletScope {
+   UUID id
+   string equity_scope_key
+   string valuation_currency
+ }
+ class Instrument {
+   string exchange_symbol
+   string market_type
+   string settle
+   Decimal contract_size
+ }
+ class ExchangeAdapter {
+   load_markets()
+   fetch_snapshot()
+   watch_events()
+   submit_order()
+   reconcile_order()
+ }
+ class OrderCommand {
+   UUID id
+   string idempotency_key
+   string status
+ }
+ class ExchangeOrder {
+   string client_order_id
+   string exchange_order_id
+   Decimal filled
+ }
+ class RiskService {
+   precheck()
+   reserve_budget()
+ }
+ AccountConnection "1" --> "1..*" WalletScope
+ ExchangeAdapter --> AccountConnection
+ ExchangeAdapter --> Instrument
+ RiskService --> OrderCommand
+ OrderCommand "1" --> "0..*" ExchangeOrder

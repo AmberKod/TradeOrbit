@@ -1,0 +1,21 @@
+sequenceDiagram
+ participant UI as 前端
+ participant API as API
+ participant DB as PostgreSQL
+ participant EXE as 执行Worker
+ participant EX as 交易所
+ UI->>API: POST orders + Idempotency-Key
+ API->>DB: 记录命令与请求摘要
+ API-->>UI: 202 command_id
+ EXE->>DB: 获得账户写入权并检查状态
+ EXE->>EXE: 最新风控与额度预留
+ EXE->>EX: 提交带client_order_id的委托
+ alt 明确受理
+ EX-->>EXE: 交易所订单号
+ EXE->>DB: 保存受理，等待订单/成交事件
+ else 响应丢失或超时
+ EXE->>DB: UNKNOWN，保留预算
+ EXE->>EX: 按客户端订单号查询并回补成交
+ end
+ DB-->>API: outbox订单状态
+ API-->>UI: WebSocket事实更新
