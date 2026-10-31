@@ -3,6 +3,6 @@ import vue from '@vitejs/plugin-vue'
 
 export default defineConfig({
   plugins: [vue()],
-  server: { port: 5173, strictPort: true, proxy: { '/api': { target: 'http://127.0.0.1:18000', changeOrigin: false } } },
+  server: { port: 5173, strictPort: true, proxy: { '/api': { target: 'http://127.0.0.1:18000', changeOrigin: false, ws: true } } },
   test: { environment: 'jsdom', include: ['src/**/*.test.ts'], restoreMocks: true },
 })

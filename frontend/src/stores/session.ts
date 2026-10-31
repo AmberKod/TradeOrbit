@@ -3,6 +3,7 @@ import { defineStore } from 'pinia'
 import { api, ApiError, onUnauthorized, setCsrfToken } from '../api/client'
 import type { Session } from '../types/domain'
 import { useAccountsStore } from './accounts'
+import { useMarketStore } from './market'
 
 export const useSessionStore = defineStore('session', () => {
   const session = ref<Session | null>(null)
@@ -10,9 +11,9 @@ export const useSessionStore = defineStore('session', () => {
   const error = ref('')
   let pending: Promise<void> | null = null
   const isAdmin = computed(() => session.value?.role === 'ADMIN')
-  function clear(): void { session.value = null; setCsrfToken(''); useAccountsStore().reset() }
+  function clear(): void { session.value = null; setCsrfToken(''); useAccountsStore().reset(); useMarketStore().reset() }
   onUnauthorized(clear)
-  function assign(value: Session): void { if (session.value?.workspace.id !== value.workspace.id || session.value?.user.id !== value.user.id) useAccountsStore().reset(); session.value = value; setCsrfToken(value.csrf_token); error.value = '' }
+  function assign(value: Session): void { if (session.value?.workspace.id !== value.workspace.id || session.value?.user.id !== value.user.id) { useAccountsStore().reset(); useMarketStore().reset() }; session.value = value; setCsrfToken(value.csrf_token); error.value = '' }
   async function hydrate(): Promise<void> {
     if (initialized.value) return
     if (pending) return pending

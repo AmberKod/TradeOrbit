@@ -6,6 +6,7 @@ export const router = createRouter({
   routes: [
     { path: '/login', name: 'login', component: () => import('../views/LoginView.vue'), meta: { public: true } },
     { path: '/', name: 'overview', component: () => import('../views/OverviewView.vue'), meta: { title: '资产总览' } },
+    { path: '/market', name: 'market', component: () => import('../views/MarketView.vue'), meta: { title: '行情工作台' } },
     { path: '/accounts', name: 'accounts', component: () => import('../views/AccountsView.vue'), meta: { title: '账户连接' } },
     { path: '/system', name: 'system', component: () => import('../views/SystemView.vue'), meta: { title: '系统状态' } },
     { path: '/audit', name: 'audit', component: () => import('../views/AuditView.vue'), meta: { title: '操作审计', admin: true } },
