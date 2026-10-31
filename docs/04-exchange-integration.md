@@ -4,7 +4,9 @@
 
 ## 1. 接入路线与代码依据
 
-使用 CCXT / CCXT Pro 的 Python 接口完成公共 REST、公开行情与私有账户流，并在 TradeOrbit 中封装标准适配器。缺失能力使用明确版本的原生接口补充。依赖 pin 到测试过的发布版本；本地 CCXT 4.5.91 是源码核对快照，不代表其所有方法已完成账户联调。
+当前落地：E02-M1 公开行情使用原生公开 REST/WS；E02-M2.1 私有账户使用固定 GET 清单、受控 HMAC 签名和字段归一化，详见 [实际支持矩阵与验收](10-e02-private-accounts.md)。CCXT / CCXT Pro 目前仅作能力和字段核对参考，不是运行依赖，私有 WS 尚未实现。后续若采用 SDK，必须先选定产品/环境、固定版本并通过契约和账户联调；本地 CCXT 4.5.91 是源码核对快照，不代表已完成账户联调。
+
+以下矩阵与同步流程描述全量目标和参考库能力，不等于当前平台全部支持；以各增量文档的实际覆盖和 NOT_RUN 记录为准。
 
 源码权威入口为 E:/github_repo/ccxt/ts/src/{exchange}.ts 和 ts/src/pro/{exchange}.ts；Python 交易所文件为生成代码。若需要上游修复，遵守该库 AGENTS.md / CLAUDE.md，在 TypeScript 源文件修复并运行相应测试。TradeOrbit 的业务适配代码保留在自己的仓库。
 
@@ -55,7 +57,7 @@ class ExchangeAdapter(Protocol):
 6. 只读验收通过后才可被管理员配置为交易候选；真正交易还需 E04 风控、安全和模拟验收，不自动提升权限。
 7. 更新 / 删除凭据会停止旧会话并进行新一轮同步；历史事实不删除。
 
-## 4. CCXT 使用约定
+## 4. 后续采用 CCXT 时的约定
 
 - Binance Spot 与 USDⓈ-M 优先用明确的 binance / binanceusdm 实例；Bitget 明确 uta 配置；OKX 根据账户配置设置参数。不能在一个连接中随意切 options.defaultType 导致缓存混用。
 - 启用 SDK 限流，同时在应用层按 UID / IP / endpoint / 产品维护预算；enableRateLimit 不等于部署多个进程后自动满足总体限制。

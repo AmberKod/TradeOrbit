@@ -1,10 +1,10 @@
 # TradeOrbit 功能实现设计
 
-版本：v0.1 / 日期：2026-10-30 / 属性：全量技术规格；E01 已实现范围以 [验收记录](08-e01-acceptance-report.md) 为准，E02–E05 仍待实现；需求以 PRD 的 FR 编号为准。
+版本：v0.2 / 更新：2026-10-31 / 属性：全量技术规格；E01 以 [验收记录](08-e01-acceptance-report.md) 为准，E02 已完成 [M1 公开行情](09-e02-public-market.md) 与 [M2.1 手动账户快照](10-e02-private-accounts.md)，持续私有同步与聚合 NAV 待实现，E03–E05 仍为设计；需求以 PRD 的 FR 编号为准。
 
 ## 1. 实现方式与模块边界
 
-采用模块化后端和独立 worker，前后端独立构建，由反向代理提供同源入口。前端不直连私有交易所接口。CCXT 是接入依赖，不作为业务数据库或资产账本。Hummingbot / Freqtrade / FreqUI 是设计参考，源码许可证见来源登记表。
+采用模块化后端和独立 worker，前后端独立构建，由反向代理提供同源入口。前端不直连私有交易所接口。当前 M1/M2.1 使用受控原生 REST/WS 适配，CCXT 只作源码与字段核对参考，未引入为运行依赖；后续如引入 SDK 仍不作为业务数据库或资产账本。Hummingbot / Freqtrade / FreqUI 是设计参考，源码许可证见来源登记表。
 
 ~~~mermaid
 flowchart TB
