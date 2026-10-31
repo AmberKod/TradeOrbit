@@ -42,8 +42,7 @@ class Identity:
         return self.workspace.id
 
 
-async def identity(request: Request, db: Database) -> Identity:
-    token = request.cookies.get(runtime(request).settings.cookie_name, "")
+async def resolve_identity(token: str, db: AsyncSession) -> Identity:
     if not token or len(token) > 128:
         raise AppError("UNAUTHENTICATED", "请先登录", 401)
     stmt = (
@@ -63,6 +62,12 @@ async def identity(request: Request, db: Database) -> Identity:
     result = Identity(
         user=row[1], workspace=row[3], role=Role(row[2].role), raw_token=token, session=row[0]
     )
+    return result
+
+
+async def identity(request: Request, db: Database) -> Identity:
+    token = request.cookies.get(runtime(request).settings.cookie_name, "")
+    result = await resolve_identity(token, db)
     if request.method not in {"GET", "HEAD", "OPTIONS"}:
         expected = csrf_token(token, runtime(request).settings.session_secret.get_secret_value())
         supplied = request.headers.get("x-csrf-token", "")

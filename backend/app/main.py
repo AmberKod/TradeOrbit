@@ -5,19 +5,24 @@ from time import monotonic
 from typing import Any
 from uuid import uuid4
 
+import httpx
 import structlog
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from redis.exceptions import RedisError
 from sqlalchemy.exc import SQLAlchemyError
 from starlette.exceptions import HTTPException
 
-from app.api import accounts, audit, auth, health
+from app.account_reads import PrivateReadService
+from app.api import accounts, audit, auth, health, market
 from app.core.config import Settings
 from app.core.errors import AppError, failure
 from app.core.logging import configure_logging
 from app.db import Runtime, build_runtime
+from app.market import stream
+from app.market.service import MarketService
 
 
 def create_app(
@@ -27,22 +32,41 @@ def create_app(
     configure_logging()
     rt = injected_runtime or build_runtime(config)
 
+    client = httpx.AsyncClient(
+        timeout=httpx.Timeout(12, connect=5),
+        trust_env=False,
+        proxy=config.public_proxy_url.get_secret_value() if config.public_proxy_url else None,
+        limits=httpx.Limits(max_connections=12, max_keepalive_connections=6),
+    )
+
+    private_client = httpx.AsyncClient(
+        timeout=httpx.Timeout(8, connect=4),
+        trust_env=False,
+        follow_redirects=False,
+        proxy=config.private_proxy_url.get_secret_value() if config.private_proxy_url else None,
+        limits=httpx.Limits(max_connections=6, max_keepalive_connections=3),
+    )
+
     @asynccontextmanager
     async def lifespan(application: FastAPI):
         application.state.runtime = rt
         yield
+        await client.aclose()
+        await private_client.aclose()
         await rt.redis.aclose()
         await rt.engine.dispose()
 
     application = FastAPI(
         title="TradeOrbit API",
-        version="0.1.0",
+        version="0.2.0",
         lifespan=lifespan,
         docs_url="/api/docs" if config.app_env != "production" else None,
         redoc_url=None,
         openapi_url="/api/openapi.json" if config.app_env != "production" else None,
     )
     application.state.runtime = rt
+    application.state.market_service = MarketService(rt, client)
+    application.state.private_read_service = PrivateReadService(rt, private_client)
     application.add_middleware(
         CORSMiddleware,
         allow_origins=config.allowed_origins,
@@ -109,6 +133,13 @@ def create_app(
             ),
         )
 
+    @application.exception_handler(RedisError)
+    async def cache_error(request: Request, exc: RedisError):
+        return JSONResponse(
+            status_code=503,
+            content=failure(request, AppError("DEPENDENCY_UNAVAILABLE", "数据服务暂不可用", 503)),
+        )
+
     @application.exception_handler(SQLAlchemyError)
     async def database_error(request: Request, exc: SQLAlchemyError):
         structlog.get_logger().error("database.failure", error_type=type(exc).__name__)
@@ -127,6 +158,6 @@ def create_app(
             ),
         )
 
-    for module in (auth, accounts, audit, health):
+    for module in (auth, accounts, audit, health, market, stream):
         application.include_router(module.router, prefix="/api/v1")
     return application

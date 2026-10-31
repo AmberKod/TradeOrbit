@@ -37,6 +37,7 @@ async def workflow(settings: Settings, env: dict[str, str], password: str) -> No
         transport = httpx.ASGITransport(app=app)
         async with httpx.AsyncClient(
             transport=transport,
+            trust_env=False,
             base_url="http://validation",
             headers={"Origin": "http://validation"},
         ) as client:
@@ -100,6 +101,7 @@ async def workflow(settings: Settings, env: dict[str, str], password: str) -> No
             )
             async with httpx.AsyncClient(
                 transport=transport,
+                trust_env=False,
                 base_url="http://validation",
                 headers={"Origin": "http://validation"},
             ) as viewer:

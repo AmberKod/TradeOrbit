@@ -35,7 +35,13 @@ async def dependencies(request: Request) -> dict[str, str]:
 @router.get("/health/live")
 async def live(request: Request) -> dict[str, Any]:
     return success(
-        request, {"status": "ALIVE", "version": "0.1.0", "stage": "E01", "trading_enabled": False}
+        request,
+        {
+            "status": "ALIVE",
+            "version": "0.2.0",
+            "stage": "E02_PRIVATE_READ_MANUAL",
+            "trading_enabled": False,
+        },
     )
 
 
@@ -54,12 +60,12 @@ async def system_status(request: Request, current: CurrentIdentity) -> dict[str,
     return success(
         request,
         {
-            "stage": "E01",
-            "version": "0.1.0",
+            "stage": "E02_PRIVATE_READ_MANUAL",
+            "version": "0.2.0",
             "app_environment": runtime(request).settings.app_env,
             "trading_enabled": False,
             "checks": await dependencies(request),
-            "exchange_integration": "NOT_IMPLEMENTED",
+            "exchange_integration": "PUBLIC_MARKET_AND_MANUAL_PRIVATE_READ",
             "workspace_id": str(current.workspace_id),
         },
     )

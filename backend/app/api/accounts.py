@@ -1,14 +1,16 @@
-"""Role-protected connection CRUD; no exchange traffic or trading in E01."""
+"""Connection configuration and administrator-triggered private read-only snapshots."""
 
 from typing import Any
 from uuid import UUID
 
 from fastapi import APIRouter, Request
-from sqlalchemy import select
+from sqlalchemy import delete, select
 
+from app.account_reads import render_state
 from app.api.deps import Administrator, CurrentIdentity, Database, runtime
 from app.core.errors import AppError, success
 from app.core.security import CredentialCipher, aware_utc
+from app.models.account_state import AccountReadState
 from app.models.accounts import AccountConnection, EncryptedCredential
 from app.models.identity import AuditLog
 from app.schemas.accounts import AccountCreate, AccountUpdate, CredentialInput
@@ -16,7 +18,8 @@ from app.schemas.accounts import AccountCreate, AccountUpdate, CredentialInput
 router = APIRouter(prefix="/accounts", tags=["accounts"])
 
 
-def serialize(account: AccountConnection) -> dict[str, Any]:
+def serialize(account: AccountConnection, state: AccountReadState | None = None) -> dict[str, Any]:
+    capability = render_state(account, state, include_data=False)
     return {
         "id": str(account.id),
         "label": account.label,
@@ -29,7 +32,10 @@ def serialize(account: AccountConnection) -> dict[str, Any]:
         "credential_version": account.credential_version,
         "created_at": aware_utc(account.created_at).isoformat(),
         "updated_at": aware_utc(account.updated_at).isoformat(),
-        "capability_state": "NOT_VERIFIED",
+        "capability_state": capability["state"],
+        "sync_supported": capability["sync_supported"],
+        "sync_block_reason": capability["sync_block_reason"],
+        "checked_at": capability["checked_at"],
     }
 
 
@@ -70,8 +76,9 @@ def audit(
 @router.get("")
 async def list_accounts(request: Request, current: CurrentIdentity, db: Database) -> dict[str, Any]:
     rows = (
-        await db.scalars(
-            select(AccountConnection)
+        await db.execute(
+            select(AccountConnection, AccountReadState)
+            .outerjoin(AccountReadState, AccountReadState.account_id == AccountConnection.id)
             .where(
                 AccountConnection.workspace_id == current.workspace_id,
                 AccountConnection.status != "ARCHIVED",
@@ -79,7 +86,7 @@ async def list_accounts(request: Request, current: CurrentIdentity, db: Database
             .order_by(AccountConnection.created_at.desc())
         )
     ).all()
-    return success(request, [serialize(row) for row in rows])
+    return success(request, [serialize(account, state) for account, state in rows])
 
 
 @router.post("", status_code=201)
@@ -105,7 +112,8 @@ async def create_account(
 async def read_account(
     account_id: UUID, request: Request, current: CurrentIdentity, db: Database
 ) -> dict[str, Any]:
-    return success(request, serialize(await scoped_account(account_id, current.workspace_id, db)))
+    account = await scoped_account(account_id, current.workspace_id, db)
+    return success(request, serialize(account, await db.get(AccountReadState, account.id)))
 
 
 @router.patch("/{account_id}")
@@ -117,7 +125,7 @@ async def update_account(
     audit(request, current, db, "account.updated", account.id, {"fields": ["label"]})
     await db.flush()
     await db.commit()
-    return success(request, serialize(account))
+    return success(request, serialize(account, await db.get(AccountReadState, account.id)))
 
 
 @router.delete("/{account_id}")
@@ -126,6 +134,7 @@ async def archive_account(
 ) -> dict[str, Any]:
     account = await scoped_account(account_id, current.workspace_id, db, for_update=True)
     account.status = "ARCHIVED"
+    await db.execute(delete(AccountReadState).where(AccountReadState.account_id == account.id))
     audit(request, current, db, "account.archived", account.id, {})
     await db.commit()
     return success(request, {"id": str(account_id), "archived": True})
@@ -166,6 +175,7 @@ async def save_credentials(
         record.ciphertext, record.key_version = cipher.encrypt(values), cipher.version
     account.credential_version += 1
     account.status = "CONFIGURED"
+    await db.execute(delete(AccountReadState).where(AccountReadState.account_id == account.id))
     audit(
         request,
         current,
@@ -194,10 +204,25 @@ async def capabilities(
     account = await scoped_account(account_id, current.workspace_id, db)
     return success(
         request,
-        {
-            "account_id": str(account.id),
-            "state": "NOT_VERIFIED",
-            "trading_enabled": False,
-            "reason": "E01 仅保存连接配置，交易所探测与同步在 E02 实现",
-        },
+        render_state(account, await db.get(AccountReadState, account.id), include_data=False),
     )
+
+
+@router.get("/{account_id}/snapshot")
+async def snapshot(
+    account_id: UUID, request: Request, current: CurrentIdentity, db: Database
+) -> dict[str, Any]:
+    account = await scoped_account(account_id, current.workspace_id, db)
+    return success(request, render_state(account, await db.get(AccountReadState, account.id)))
+
+
+@router.post("/{account_id}/verify")
+async def verify(
+    account_id: UUID, request: Request, current: Administrator, db: Database
+) -> dict[str, Any]:
+    workspace_id, actor_id = current.workspace_id, current.user.id
+    await db.commit()
+    result = await request.app.state.private_read_service.sync(
+        account_id, workspace_id, actor_id, request.state.request_id
+    )
+    return success(request, result)

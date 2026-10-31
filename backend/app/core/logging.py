@@ -38,6 +38,9 @@ def redact_event(_logger: Any, _method: str, event: EventDict) -> EventDict:
 
 def configure_logging() -> None:
     logging.basicConfig(level=logging.INFO, format="%(message)s")
+    # HTTPX INFO includes signed URLs; HTTP core debug may include request headers.
+    for name in ("httpx", "httpcore"):
+        logging.getLogger(name).setLevel(logging.CRITICAL + 1)
     structlog.configure(
         processors=[
             structlog.contextvars.merge_contextvars,

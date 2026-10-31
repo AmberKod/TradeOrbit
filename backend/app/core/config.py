@@ -1,14 +1,14 @@
 """Validated configuration. Secrets have no insecure development defaults."""
 
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 from cryptography.fernet import Fernet
-from pydantic import Field, SecretStr, model_validator
+from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
-SCHEMA_REVISION = "0001_foundation"
+SCHEMA_REVISION = "0003_account_read_state"
 
 
 class Settings(BaseSettings):
@@ -35,7 +35,14 @@ class Settings(BaseSettings):
     cookie_name: str = "tradeorbit_session"
     session_hours: int = Field(default=8, ge=1, le=24)
     login_attempts_per_minute: int = Field(default=8, ge=1, le=100)
+    public_proxy_url: SecretStr | None = None
+    private_proxy_url: SecretStr | None = None
     trading_enabled: bool = False
+
+    @field_validator("public_proxy_url", "private_proxy_url", mode="before")
+    @classmethod
+    def empty_proxy(cls, value: Any) -> Any:
+        return value or None
 
     @model_validator(mode="after")
     def validate_security(self) -> "Settings":
@@ -45,8 +52,16 @@ class Settings(BaseSettings):
             Fernet(self.credential_encryption_key.get_secret_value().encode("ascii"))
         except (ValueError, UnicodeEncodeError) as exc:
             raise ValueError("CREDENTIAL_ENCRYPTION_KEY must be a valid Fernet key") from exc
+        if self.public_proxy_url and not self.public_proxy_url.get_secret_value().startswith(
+            ("http://", "https://")
+        ):
+            raise ValueError("PUBLIC_PROXY_URL requires an HTTP(S) proxy")
+        if self.private_proxy_url and not self.private_proxy_url.get_secret_value().startswith(
+            ("http://", "https://")
+        ):
+            raise ValueError("PRIVATE_PROXY_URL requires an HTTP(S) proxy")
         if self.trading_enabled:
-            raise ValueError("Trading is unavailable in the E01 foundation release")
+            raise ValueError("Trading is unavailable in the current release")
         if not self.allowed_origins or "*" in self.allowed_origins:
             raise ValueError("Explicit allowed origins are required")
         if self.app_env == "production":

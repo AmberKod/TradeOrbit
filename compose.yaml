@@ -34,6 +34,8 @@ services:
     environment: &api-environment
       TRADEORBIT_DATABASE_URL: postgresql+asyncpg://tradeorbit:${POSTGRES_PASSWORD}@db:5432/tradeorbit
       TRADEORBIT_REDIS_URL: redis://cache:6379/0
+      TRADEORBIT_PUBLIC_PROXY_URL: ${TRADEORBIT_PUBLIC_PROXY_URL:-}
+      TRADEORBIT_PRIVATE_PROXY_URL: ${TRADEORBIT_PRIVATE_PROXY_URL:-}
     command: ["alembic", "upgrade", "head"]
     networks: [data]
     depends_on:
@@ -71,6 +73,25 @@ services:
       interval: 10s
       timeout: 5s
       retries: 3
+    restart: unless-stopped
+  market-worker:
+    image: tradeorbit-backend:local
+    build: ./backend
+    environment:
+      TRADEORBIT_DATABASE_URL: postgresql+asyncpg://tradeorbit:${POSTGRES_PASSWORD}@db:5432/tradeorbit
+      TRADEORBIT_REDIS_URL: redis://cache:6379/0
+      TRADEORBIT_PUBLIC_PROXY_URL: ${TRADEORBIT_PUBLIC_PROXY_URL:-}
+    command: ["python", "-m", "app.market.worker"]
+    networks: [app, data]
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+      cache: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD", "python", "-m", "app.market.worker", "--check"]
+      interval: 10s
+      timeout: 5s
+      retries: 4
+      start_period: 20s
     restart: unless-stopped
   frontend:
     image: tradeorbit-frontend:local

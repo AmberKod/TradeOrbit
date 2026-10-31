@@ -10,7 +10,7 @@ from cryptography.fernet import Fernet
 from fakeredis.aioredis import FakeRedis
 from sqlalchemy import text
 
-from app.core.config import Settings
+from app.core.config import SCHEMA_REVISION, Settings
 from app.core.security import hash_password
 from app.db import Base, Runtime, build_runtime
 from app.main import create_app
@@ -55,7 +55,9 @@ async def harness(encoded_password):
     async with rt.engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
         await conn.execute(text("CREATE TABLE alembic_version (version_num VARCHAR(32) NOT NULL)"))
-        await conn.execute(text("INSERT INTO alembic_version VALUES ('0001_foundation')"))
+        await conn.execute(
+            text("INSERT INTO alembic_version VALUES (:revision)"), {"revision": SCHEMA_REVISION}
+        )
     async with rt.sessions() as db:
         workspace, other = Workspace(name="Test workspace"), Workspace(name="Other workspace")
         db.add_all([workspace, other])
@@ -71,6 +73,7 @@ async def harness(encoded_password):
     async with app.router.lifespan_context(app):
         async with httpx.AsyncClient(
             transport=httpx.ASGITransport(app=app, raise_app_exceptions=False),
+            trust_env=False,
             base_url="http://testserver",
             headers={"Origin": "http://testserver"},
         ) as client:
